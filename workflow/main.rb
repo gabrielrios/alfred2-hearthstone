@@ -5,7 +5,6 @@ require 'rubygems' unless defined? Gem # rubygems is only needed in 1.8
 require "bundler/setup"
 require "alfred"
 require 'json'
-require 'sanitize'
 
 class Card
   attr_reader :fb, :card, :type
@@ -38,7 +37,7 @@ class Card
     fb.add_item({
       uid: "#{@id}_text",
       icon: { :type => "default", :name => "icon.png" },
-      title: Sanitize.fragment(@text),
+      title: @text,
     })
     fb.add_item({
       uid: "#{@id}_cost",
