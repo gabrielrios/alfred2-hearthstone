@@ -39,12 +39,12 @@ class Card
     fb.add_item({
       uid: "#{@id}_text",
       icon: { :type => "default", :name => "icon.png" },
-      title: @text,
+      title: @text.to_s,
     })
     fb.add_item({
       uid: "#{@id}_cost",
       icon: { :type => "default", :name => "icons/mana.png" },
-      title: @cost
+      title: @cost.to_s
     })
     if minion? || weapon?
       fb.add_item({
@@ -100,7 +100,7 @@ class Card
   end
 
   def rarity_icon
-    @quality.downcase == "free" ? "icon.png" : "icons/#{@quality.downcase}.png"
+    @quality.nil? || @quality.downcase == "free" ? "icon.png" : "icons/#{@quality.downcase}.png"
   end
 end
 
@@ -113,20 +113,16 @@ class HearthStoneSearcher
     @sets.reject! { |set| ["Credits", "Debug", "Missions", "System"].include?(set)  }
   end
 
-  def search(arg)
-    _card =nil
-    @sets.each do |set|
-      _card = @cards[set].detect {|card| card["name"].downcase == arg.downcase && card["type"].downcase != "hero" }
-      break if _card
+  def search(arg, field = "name")
+    if arg =~ /\w{3}_\d{3}\S*/
+      arg = arg.scan(/\w{3}_\d{3}\S*/).first
+      field = "id"
     end
-    if _card
-      cards = [_card]
-    else
-      cards = @sets.flat_map do |set|
-        cards = @cards[set].select {|card| card["name"].downcase.include?(arg.downcase) && card["type"].downcase != "hero" }
-        cards.each {|c| c['set'] = set }
-        cards
-      end
+
+    cards = @sets.flat_map do |set|
+      cards = @cards[set].select {|card| card[field].downcase.include?(arg.downcase) && card["type"].downcase != "hero" }
+      cards.each {|c| c['set'] = set }
+      cards
     end
 
     if cards.size == 1
@@ -138,7 +134,7 @@ class HearthStoneSearcher
           title: format_title(card),
           subtitle: card["text"],
           valid: 'no',
-          autocomplete: card["name"]
+          autocomplete: "#{card["name"]} #{card["id"]}"
         })
       end
     end
