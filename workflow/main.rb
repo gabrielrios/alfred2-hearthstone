@@ -11,21 +11,24 @@ require 'json'
 class Card
   attr_reader :fb, :card, :type
   def initialize(fb, card)
-    @fb = fb
-    @id = card["id"]
-    @type       = card["type"]
-    @name       = card["name"]
-    @cost       = card["cost"]
-    @attack     = card["attack"]
-    @durability = card["durability"]
-    @health     = card["health"]
-    @quality    = card["rarity"]
-    @class      = card["playerClass"] unless card["playerClass"].nil?
-    @durability       = card["durability"] unless card["durability"].nil?
-    @race       = card["race"] unless card["race"].nil?
-    @set       = card["set"] unless card["set"].nil?
-    @text       = card["text"] unless card["text"].nil?
-    @flavor     = card["flavor"] unless card["flavor"].nil?
+    @fb             = fb
+    @id             = card["id"]
+    @type           = card["type"]
+    @name           = card["name"]
+    @cost           = card["cost"]
+    @attack         = card["attack"]
+    @health         = card["health"]
+    @quality        = card["rarity"]
+    @collectible    = card["collectible"]
+    @url            = card["name"].downcase.gsub(/\s+/, '-').gsub(/\'+/,'').gsub(/\,/,'')
+    @class          = card["playerClass"] unless card["playerClass"].nil?
+    @durability     = card["durability"] unless card["durability"].nil?
+    @race           = card["race"] unless card["race"].nil?
+    @set            = card["set"] unless card["set"].nil?
+    @text           = card["text"] unless card["text"].nil?
+    @flavor         = card["flavor"] unless card["flavor"].nil?
+    @dust           = card["dust"] unless card["dust"].nil?
+    @mechanics      = card["mechanics"] unless card["mechanics"].nil?
   end
 
   def format
@@ -39,7 +42,7 @@ class Card
     fb.add_item({
       uid: "#{@id}_text",
       icon: { :type => "default", :name => "icon.png" },
-      title: @text.to_s,
+      title: @text.to_s.gsub(/\n/, ' ').gsub(%r{</?[^>]+?>}, ''),
     })
     fb.add_item({
       uid: "#{@id}_cost",
@@ -71,24 +74,42 @@ class Card
       fb.add_item({
         uid: "#{@id}_class",
         icon: { :type => "default", :name => "icons/#{@class.downcase}.png" },
-        title: "#{@class} Card"
+        title: "#{@class.split.map(&:capitalize).join(' ')} Card"
       })
     end
     if @type || @race
-      t = "Type: #{@type}" if @type
-      r = "Race: #{@race}" if @race
-      s = "Set: #{@set}" if @set
+
+      fullSets = {
+        "EXPERT1"      => 'Default',
+        "CORE"         => 'Core',
+        "NAXX"         => 'Naxaramus',
+        "GVG"          => 'Goblins vs Gnomes',
+        "BRM"          => 'Blackrock Mountain',
+        "TGT"          => 'The Grand Tournamanet',
+        "LOE"          => 'The League of Explorers',
+        "OG"           => 'Whispers of the Old Gods ',
+        "KARA"         => 'One Night in Karazan',
+        "GANGS"        => 'Mean Streets of Gadgetzan',
+      }
+
+      t = "Type: #{@type}".split.map(&:capitalize).join(' ') if @type
+      r = "Race: #{@race}".split.map(&:capitalize).join(' ') if @race
+      @ss = fullSets[@set]
+      s = "Set: #{@ss}" if @set
+      # s = "Set: #{@set}" if @set
       fb.add_item({
         uid: "#{@id}_type",
         icon: { :type => "default", :name => "icon.png" },
-        title: [t,r, s].compact.join(" | "),
+        title: [t, r, s].compact.join(" | "),
       })
     end
 
   end
 
   def url
-    "http://hearthhead.com/card=#{@id}"
+    # "http://hearthhead.com/card=#{@id}"
+    #@url
+    @name
   end
 
   def minion?
@@ -108,9 +129,9 @@ class HearthStoneSearcher
   attr_reader :fb
   def initialize(fb)
     @fb = fb
-    @sets = JSON.parse(File.read("./sets8.json"))
-    @cards = JSON.parse(File.read("./cards.json"))
-    @sets.reject! { |set| ["Credits", "Debug", "Missions", "System"].include?(set)  }
+    # @sets = JSON.parse(File.read("./sets8.json"))
+    @cards = JSON.parse(File.read("./cards.collectible.json"))
+    # @sets.reject! { |set| ["Credits", "Debug", "Missions", "System"].include?(set)  }
   end
 
   def search(arg, field = "name")
@@ -119,13 +140,29 @@ class HearthStoneSearcher
       field = "id"
     end
 
-    cards = @sets.flat_map do |set|
-      cards = @cards[set].select {|card| card[field].downcase.include?(arg.downcase) && card["type"].downcase != "hero" }
-      cards.each {|c| c['set'] = set }
-      cards
-    end
+    # cards = @sets.flat_map do |set|
+    cards = @cards.select {|card| card[field].downcase.include?(arg.downcase) && card["type"].downcase != "hero" }
+      # cards.each {|c| c['set'] = set }
+    cards
+    # end
 
-    if cards.size == 1
+    if cards.size == 2
+      # print 'someshit'
+      Card.new(fb, cards.first).format
+      second = cards[1]
+      fb.add_item({
+          title: '-------------- MORE CARDS --------------',
+          icon: { :type => "default", :name => "icons/blank.png" },
+        })
+      fb.add_item({
+          second: second["id"],
+          title: format_title(second),
+          subtitle: second["text"],
+          valid: 'no',
+          autocomplete: "#{second["name"]}"
+        })
+
+    elsif cards.size == 1
       Card.new(fb, cards.first).format
     else
       cards.map do |card|
@@ -134,7 +171,7 @@ class HearthStoneSearcher
           title: format_title(card),
           subtitle: card["text"],
           valid: 'no',
-          autocomplete: "#{card["name"]} #{card["id"]}"
+          autocomplete: "#{card["name"]}"
         })
       end
     end
