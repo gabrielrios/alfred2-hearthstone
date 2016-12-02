@@ -20,7 +20,7 @@ class Card
     @health         = card["health"]
     @quality        = card["rarity"]
     @collectible    = card["collectible"]
-    @set            = card["set"]
+    @url            = card["name"].downcase.gsub(/\s+/, '-').gsub(/\'+/,'').gsub(/\,/,'')
     @class          = card["playerClass"] unless card["playerClass"].nil?
     @durability     = card["durability"] unless card["durability"].nil?
     @race           = card["race"] unless card["race"].nil?
@@ -42,7 +42,7 @@ class Card
     fb.add_item({
       uid: "#{@id}_text",
       icon: { :type => "default", :name => "icon.png" },
-      title: @text.to_s,
+      title: @text.to_s.gsub(/\n/, ' ').gsub(%r{</?[^>]+?>}, ''),
     })
     fb.add_item({
       uid: "#{@id}_cost",
@@ -89,12 +89,14 @@ class Card
         "LOE"          => 'The League of Explorers',
         "OG"           => 'Whispers of the Old Gods ',
         "KARA"         => 'One Night in Karazan',
+        "GANGS"        => 'Mean Streets of Gadgetzan',
       }
 
       t = "Type: #{@type}".split.map(&:capitalize).join(' ') if @type
       r = "Race: #{@race}".split.map(&:capitalize).join(' ') if @race
       @ss = fullSets[@set]
       s = "Set: #{@ss}" if @set
+      # s = "Set: #{@set}" if @set
       fb.add_item({
         uid: "#{@id}_type",
         icon: { :type => "default", :name => "icon.png" },
@@ -105,7 +107,9 @@ class Card
   end
 
   def url
-    "http://hearthhead.com/card=#{@id}"
+    # "http://hearthhead.com/card=#{@id}"
+    #@url
+    @name
   end
 
   def minion?
@@ -125,7 +129,9 @@ class HearthStoneSearcher
   attr_reader :fb
   def initialize(fb)
     @fb = fb
-    @cards = JSON.parse(File.read("./cards.json"))
+    # @sets = JSON.parse(File.read("./sets8.json"))
+    @cards = JSON.parse(File.read("./cards.collectible.json"))
+    # @sets.reject! { |set| ["Credits", "Debug", "Missions", "System"].include?(set)  }
   end
 
   def search(arg, field = "name")
@@ -134,10 +140,29 @@ class HearthStoneSearcher
       field = "id"
     end
 
+    # cards = @sets.flat_map do |set|
     cards = @cards.select {|card| card[field].downcase.include?(arg.downcase) && card["type"].downcase != "hero" }
+      # cards.each {|c| c['set'] = set }
     cards
+    # end
 
-    if cards.size == 1
+    if cards.size == 2
+      # print 'someshit'
+      Card.new(fb, cards.first).format
+      second = cards[1]
+      fb.add_item({
+          title: '-------------- MORE CARDS --------------',
+          icon: { :type => "default", :name => "icons/blank.png" },
+        })
+      fb.add_item({
+          second: second["id"],
+          title: format_title(second),
+          subtitle: second["text"],
+          valid: 'no',
+          autocomplete: "#{second["name"]}"
+        })
+
+    elsif cards.size == 1
       Card.new(fb, cards.first).format
     else
       cards.map do |card|
